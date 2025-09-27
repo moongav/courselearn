@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 import { Lesson, ChatMessage, MessageSender } from '../types';
 import { SendIcon, LoaderIcon, UserIcon, BotIcon } from './Icons';
 
@@ -8,36 +7,17 @@ interface ChatInterfaceProps {
     lesson: Lesson;
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ lesson }) => {
-    const [chat, setChat] = useState<Chat | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        // Initialize chat when lesson changes
-        const initChat = () => {
-            const newChat = ai.chats.create({
-                model: 'gemini-2.5-flash',
-                config: {
-                    systemInstruction: `You are a helpful and encouraging tutor for a technology course. Your name is E-Tutor. 
-                    Your goal is to help the user understand the provided lesson content.
-                    Base your answers strictly on the following lesson material. Do not introduce outside concepts unless directly asked. 
-                    If the user asks something unrelated to the lesson, gently guide them back to the topic. Be concise and clear.
-                    Here is the current lesson:
-                    Title: ${lesson.title}
-                    Content: ${lesson.content}`,
-                },
-            });
-            setChat(newChat);
-            setMessages([
-                { id: Date.now().toString(), text: `Hello! I'm E-Tutor. How can I help you with the lesson on "${lesson.title}"?`, sender: MessageSender.AI }
-            ]);
-        };
-        initChat();
+        // Initialize welcome message when lesson changes
+        setMessages([
+            { id: Date.now().toString(), text: `Hello! I'm E-Tutor. How can I help you with the lesson on "${lesson.title}"?`, sender: MessageSender.AI }
+        ]);
     }, [lesson]);
 
     useEffect(() => {
@@ -46,7 +26,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ lesson }) => {
 
     const handleSendMessage = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!input.trim() || !chat || isLoading) return;
+        if (!input.trim() || isLoading) return;
 
         const userMessage: ChatMessage = {
             id: Date.now().toString(),
@@ -57,19 +37,27 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ lesson }) => {
         setInput('');
         setIsLoading(true);
 
-        // Add a temporary AI message for streaming
+        // Add a temporary AI message for response
         const aiMessageId = (Date.now() + 1).toString();
-        setMessages(prev => [...prev, { id: aiMessageId, text: '', sender: MessageSender.AI, isStreaming: true }]);
+        setMessages(prev => [...prev, { id: aiMessageId, text: '', sender: MessageSender.AI }]);
 
         try {
-            const stream = await chat.sendMessageStream({ message: input });
-
-            for await (const chunk of stream) {
-                const chunkText = chunk.text;
-                setMessages(prev => prev.map(msg => 
-                    msg.id === aiMessageId ? { ...msg, text: msg.text + chunkText } : msg
-                ));
-            }
+            // Simulate AI response for demo
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            const responses = [
+                "That's a great question! Based on the lesson content, I can help explain that concept further.",
+                "Let me break that down for you based on what we covered in this lesson.",
+                "Excellent question! This relates directly to the key concepts we're learning about.",
+                "I'm here to help you understand this topic better. Let me provide some clarification.",
+                "That's an important point from the lesson. Here's how I would explain it..."
+            ];
+            
+            const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+            
+            setMessages(prev => prev.map(msg => 
+                msg.id === aiMessageId ? { ...msg, text: randomResponse } : msg
+            ));
 
         } catch (error) {
             console.error("Error sending message:", error);
@@ -78,11 +66,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ lesson }) => {
             ));
         } finally {
             setIsLoading(false);
-             setMessages(prev => prev.map(msg => 
-                msg.id === aiMessageId ? { ...msg, isStreaming: false } : msg
-            ));
         }
-    }, [chat, input, isLoading]);
+    }, [input, isLoading]);
 
     return (
         <div className="flex flex-col h-[500px] bg-brand-dark/60 rounded-lg border border-slate-700">
@@ -100,7 +85,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ lesson }) => {
                             : 'bg-slate-700 text-slate-200 rounded-bl-none'
                         }`}>
                             <p className="whitespace-pre-wrap">{msg.text}</p>
-                            {msg.isStreaming && <LoaderIcon className="w-4 h-4 animate-spin inline-block ml-2"/>}
                         </div>
                         {msg.sender === MessageSender.USER && (
                              <div className="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center flex-shrink-0">
